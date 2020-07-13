@@ -61,6 +61,11 @@ var (
 		&cluster.Metadata{},
 	}
 
+	OfflinePackage = []asset.WriteableAsset{
+		// TODO: define writeable types and files in the offline package asset dir, then add them here to be added to cobra command array as exec targets
+		// &offlinepackage.
+	}
+
 	// Cluster are the cluster targeted assets.
 	Cluster = []asset.WritableAsset{
 		&cluster.Metadata{},

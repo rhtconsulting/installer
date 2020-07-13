@@ -80,6 +80,17 @@ var (
 		assets: targetassets.IgnitionConfigs,
 	}
 
+	offlinePackageTarget = target{
+		name: "Offline Packages",
+		command: &cobra.Command{
+			Use:   "offline-package",
+			Short: "Generates the Offline Package asset",
+			// FIXME: add longer descriptions for our commands with examples for better UX.
+			// Long:  "",
+		},
+		assets: targetassets.OfflinePackage,
+	}
+
 	clusterTarget = target{
 		name: "Cluster",
 		command: &cobra.Command{
@@ -140,7 +151,7 @@ var (
 		assets: targetassets.Cluster,
 	}
 
-	targets = []target{installConfigTarget, manifestsTarget, ignitionConfigsTarget, clusterTarget}
+	targets = []target{installConfigTarget, manifestsTarget, ignitionConfigsTarget, offlinePackageTarget, clusterTarget}
 )
 
 func newCreateCmd() *cobra.Command {
