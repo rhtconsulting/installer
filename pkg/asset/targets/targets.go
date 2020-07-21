@@ -13,6 +13,7 @@ import (
 	"github.com/openshift/installer/pkg/asset/templates/content/bootkube"
 	"github.com/openshift/installer/pkg/asset/templates/content/openshift"
 	"github.com/openshift/installer/pkg/asset/tls"
+	"github.com/openshift/installer/pkg/asset/offline"
 )
 
 var (
@@ -62,8 +63,8 @@ var (
 	}
 
 	OfflinePackage = []asset.WritableAsset{
-		// TODO: define writeable types and files in the offline package asset dir, then add them here to be added to cobra command array as exec targets
-		// &offlinepackage.
+		// LRC: Add exec to the offline.OfflinePackage target.  
+                &offline.OfflinePackage{}, 
 	}
 
 	// Cluster are the cluster targeted assets.
