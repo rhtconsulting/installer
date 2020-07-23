@@ -24,11 +24,17 @@ var _ asset.Asset = (*rhcosReleaseMetaData)(nil)
 
 // Dependencies returns no dependencies.
 func (a *rhcosReleaseMetaData) Dependencies() []asset.Asset {
-        //panic("Dependencies")
 	return nil 
 }
 
-func (a *rhcosReleaseMetaData) CreateOfflinePackage(src string) string {
+func (a *rhcosReleaseMetaData) createOfflinePackage(src string, dest string) bool {
+
+	err := os.Chdir(dest)
+
+	if err != nil {
+		log.Println(err)
+		return false
+	}
 
 	fmt.Printf("Downloading %s\n", src)
 
@@ -39,12 +45,16 @@ func (a *rhcosReleaseMetaData) CreateOfflinePackage(src string) string {
 	u, err := url.Parse(src)
 	check(err)
 
+	fileName := dest + path.Base(u.Path)
+	fmt.Println(fileName)
 	out, err := os.Create(path.Base(u.Path))
 	defer out.Close()
 
 	size := res.ContentLength
 	bar := &Progbar{total: int(size)}
 	written := make(chan int, 500)
+
+	quit := make(chan bool)
 
 	go func() {
 		copied := 0
@@ -57,6 +67,9 @@ func (a *rhcosReleaseMetaData) CreateOfflinePackage(src string) string {
 				copied += c
 			case <-tick:
 				bar.PrintProg(copied)
+			case <-quit:
+				return		
+
 			}
 		}
 	}()
@@ -82,11 +95,11 @@ func (a *rhcosReleaseMetaData) CreateOfflinePackage(src string) string {
 		check(re)
 	}
 	bar.PrintComplete()
+	quit <- true
 
 
 
-
-	return ""
+	return true
 }
 
 
@@ -104,7 +117,6 @@ func (a *rhcosReleaseMetaData) Generate(parents asset.Parents) error {
 
 // Name returns the human-friendly name of the asset.
 func (a *rhcosReleaseMetaData) Name() string {
-	fmt.Println("RHCOS Name")
 	return "rhcosReleaseMetaData"
 }
 
