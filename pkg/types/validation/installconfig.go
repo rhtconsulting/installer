@@ -9,6 +9,7 @@ import (
 
 	dockerref "github.com/containers/image/docker/reference"
 	"github.com/pkg/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	"github.com/openshift/installer/pkg/ipnet"
@@ -37,7 +38,7 @@ const (
 )
 
 // ValidateInstallConfig checks that the specified install config is valid.
-func ValidateInstallConfig(c *types.InstallConfig, openStackValidValuesFetcher openstackvalidation.ValidValuesFetcher) field.ErrorList {
+func ValidateInstallConfig(c *types.InstallConfig) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if c.TypeMeta.APIVersion == "" {
 		return field.ErrorList{field.Required(field.NewPath("apiVersion"), "install-config version required")}
@@ -81,7 +82,7 @@ func ValidateInstallConfig(c *types.InstallConfig, openStackValidValuesFetcher o
 	} else {
 		allErrs = append(allErrs, field.Required(field.NewPath("networking"), "networking is required"))
 	}
-	allErrs = append(allErrs, validatePlatform(&c.Platform, field.NewPath("platform"), openStackValidValuesFetcher, c.Networking, c)...)
+	allErrs = append(allErrs, validatePlatform(&c.Platform, field.NewPath("platform"), c.Networking, c)...)
 	if c.ControlPlane != nil {
 		allErrs = append(allErrs, validateControlPlane(&c.Platform, c.ControlPlane, field.NewPath("controlPlane"))...)
 	} else {
@@ -98,6 +99,7 @@ func ValidateInstallConfig(c *types.InstallConfig, openStackValidValuesFetcher o
 	if _, ok := validPublishingStrategies[c.Publish]; !ok {
 		allErrs = append(allErrs, field.NotSupported(field.NewPath("publish"), c.Publish, validPublishingStrategyValues))
 	}
+	allErrs = append(allErrs, validateCloudCredentialsMode(c.CredentialsMode, field.NewPath("credentialsMode"), c.Platform.Name())...)
 
 	return allErrs
 }
@@ -300,8 +302,10 @@ func validateClusterNetwork(n *types.Networking, cn *types.ClusterNetworkEntry, 
 	if cn.HostPrefix < 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("hostPrefix"), cn.HostPrefix, "hostPrefix must be positive"))
 	}
-	if ones, _ := cn.CIDR.Mask.Size(); cn.HostPrefix < int32(ones) {
+	if ones, bits := cn.CIDR.Mask.Size(); cn.HostPrefix < int32(ones) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("hostPrefix"), cn.HostPrefix, "cluster network host subnetwork prefix must not be larger size than CIDR "+cn.CIDR.String()))
+	} else if bits == 128 && cn.HostPrefix != 64 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("hostPrefix"), cn.HostPrefix, "cluster network host subnetwork prefix must be 64 for IPv6 networks"))
 	}
 	return allErrs
 }
@@ -338,7 +342,7 @@ func validateCompute(platform *types.Platform, control *types.MachinePool, pools
 	return allErrs
 }
 
-func validatePlatform(platform *types.Platform, fldPath *field.Path, openStackValidValuesFetcher openstackvalidation.ValidValuesFetcher, network *types.Networking, c *types.InstallConfig) field.ErrorList {
+func validatePlatform(platform *types.Platform, fldPath *field.Path, network *types.Networking, c *types.InstallConfig) field.ErrorList {
 	allErrs := field.ErrorList{}
 	activePlatform := platform.Name()
 	platforms := make([]string, len(types.PlatformNames))
@@ -371,7 +375,7 @@ func validatePlatform(platform *types.Platform, fldPath *field.Path, openStackVa
 	}
 	if platform.OpenStack != nil {
 		validate(openstack.Name, platform.OpenStack, func(f *field.Path) field.ErrorList {
-			return openstackvalidation.ValidatePlatform(platform.OpenStack, network, f, openStackValidValuesFetcher, c)
+			return openstackvalidation.ValidatePlatform(platform.OpenStack, network, f, c)
 		})
 	}
 	if platform.VSphere != nil {
@@ -464,3 +468,29 @@ var (
 		return v
 	}()
 )
+
+func validateCloudCredentialsMode(mode types.CredentialsMode, fldPath *field.Path, platform string) field.ErrorList {
+	if mode == "" {
+		return nil
+	}
+	allErrs := field.ErrorList{}
+	// validPlatformCredentialsModes is a map from the platform name to a slice of credentials modes that are valid
+	// for the platform. If a platform name is not in the map, then the credentials mode cannot be set for that platform.
+	validPlatformCredentialsModes := map[string][]types.CredentialsMode{
+		aws.Name:   {types.MintCredentialsMode, types.PassthroughCredentialsMode, types.ManualCredentialsMode},
+		azure.Name: {types.MintCredentialsMode, types.PassthroughCredentialsMode},
+		gcp.Name:   {types.MintCredentialsMode, types.PassthroughCredentialsMode},
+	}
+	if validModes, ok := validPlatformCredentialsModes[platform]; ok {
+		validModesSet := sets.NewString()
+		for _, m := range validModes {
+			validModesSet.Insert(string(m))
+		}
+		if !validModesSet.Has(string(mode)) {
+			allErrs = append(allErrs, field.NotSupported(fldPath, mode, validModesSet.List()))
+		}
+	} else {
+		allErrs = append(allErrs, field.Invalid(fldPath, mode, fmt.Sprintf("cannot be set when using the %q platform", platform)))
+	}
+	return allErrs
+}

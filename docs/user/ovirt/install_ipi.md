@@ -1,3 +1,17 @@
+![oVirt Logo](./images/oVirt-logo.png#center)
+
+**Table of Contents**
+
+- [Install using oVirt platform provider](#install-using-ovirt-platform-provider)
+  * [Overview](#overview)
+  * [Prerequisite](#prerequisite)
+  * [Minimum resources](#minimum-resources)
+  * [Install](#install)
+    + [ovirt-config.yaml](#ovirt-configyaml)
+    + [Bootstrap VM](#bootstrap-vm)
+    + [Install using the wizard](#install-using-the-wizard)
+    + [Install in stages when customization is needed](#install-in-stages-when-customization-is-needed)
+
 # Install using oVirt platform provider 
 
 ## Overview
@@ -14,10 +28,8 @@ DNS and LB services but is a platform provider. See also [OpenShift-Metal³ kni-
 ## Prerequisite
 
 1. oVirt/RHV version 4.3.9.4 or later. 
-2. Allocate 3 IP on the VM network: 
+2. Allocate 2 IP on the VM network:
     - IP for the internal kubernetes api, that all components will interact with 
-    - IP for the internal DNS service, to bootstrap etcd and to resolve names like 
-    `api.$CLUSTER_NAME.$CLUSTER_DOMAIN` and node names 
     - IP for the Ingress, the load balancer in front of the cluster apps 
     To work with this provider one must supply 2 IPs that are related to any MAC 
     in the virtualization env, where the cluster will run. Those IPs will be active 
@@ -57,6 +69,30 @@ is included in the minimum resources calculation.
 
 
 ## Install 
+### ovirt-config.yaml
+
+The ovirt-config.yaml is created under ${HOME}/.ovirt directory by the installer.
+It contains all information how the installer connects to oVirt and can be re-used
+if required to re-trigger a new installation.
+
+Below the description of all config options in ovirt-config.yaml.
+
+| Name           | Value                          | Type     | Example                                                                                                |
+| ---------------|:------------------------------:|:--------:|:------------------------------------------------------------------------------------------------------:|
+| ovirt_url      | URL for Engine API             | string   | https://engine.fqdn.home/ovirt-engine/api                                                              |
+| ovirt_fqdn     | Engine FQDN                    | string   | engine.fqdn.home                                                                                       |
+| ovirt_username | User to connect with Engine    | string   | admin@internal                                                                                         |
+| ovirt_password | Password for the user provided | string   | superpass                                                                                              |
+| ovirt_insecure | TLS verification disabled      | boolean  | false                                                                                                  |
+| ovirt_ca_bundle| CA Bundle                      | string   | -----BEGIN CERTIFICATE----- MIIDvTCCAqWgAwIBAgICEAA.... ----- END CERTIFICATE -----                    |
+| ovirt_pem_url  | PEM URL                        | string   | https://engine.fqdn.home/ovirt-engine/services/pki-resource?resource=ca-certificate&format=X509-PEM-CA |
+
+
+### Bootstrap VM
+
+The bootstrap will perform ignition fully and will advertise the IP in the
+pre-login msg. Go to Engine webadmin UI, and open the console of the bootstrap
+VM to get it.
 
 
 ### Install using the wizard 
@@ -67,15 +103,13 @@ using a wizard:
 $ openshift-install create cluster --dir=install_dir
 ? SSH Public Key /home/user/.ssh/id_dsa.pub
 ? Platform ovirt
-? Enter oVirt's api endpoint URL https://ovirt-engine-fqdn/ovirt-engine/api
-? Is the installed oVirt certificate trusted? Yes
+? Engine FQDN[:PORT] [? for help] ovirt-engine-fqdn
 ? Enter ovirt-engine username admin@internal
 ? Enter password ***
 ? oVirt cluster xxxx
 ? oVirt storage xxxx
 ? oVirt network xxxx
 ? Internal API virtual IP 10.0.0.1
-? Internal DNS virtual IP 10.0.0.2
 ? Ingress virtual IP 10.0.0.3
 ? Base Domain example.org
 ? Cluster Name test
@@ -112,11 +146,12 @@ Continue the installation using the install-config in the new folder `install_di
 $ openshift-install create cluster --dir=install_dir
 ``` 
 
-When the all prompts are done the installer will create 3 VMs under the
-Cluster supplied, and another VM as the bootstrap node.
-The bootstrap will perform ignition fully and will advertise the IP in the
-pre-login msg. Go to Engine webadmin UI, and open the console of the bootstrap
-VM to get it. 
+When the all prompts are done the installer will create ${HOME}/.ovirt/ovirt-config.yaml
+containing all required information about the connection with Engine.
+The installation process will create a temporary VM which will trigger bootstrap VM
+for later create three masters nodes. The masters nodes will create all services and
+checks required. Finally, the cluster will create the three workers node.
+
 In the end the installer finishes and the cluster should be up.
 
 To access the cluster as the system:admin user: 
@@ -125,4 +160,3 @@ To access the cluster as the system:admin user:
 $ export KUBECONFIG=$PWD/install_dir/auth/kubeconfig
 $ oc get nodes
 ```
-

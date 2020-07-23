@@ -9,14 +9,17 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/AlecAivazis/survey.v1"
 )
 
+var errHTTPNotFound = errors.New("http response 404")
+
 // Add PEM into the System Pool
-func (c *clientHTTP) addTrustBundle(pemFilePath string) error {
+func (c *clientHTTP) addTrustBundle(pemFilePath string, engineConfig *Config) error {
 	c.certPool, _ = x509.SystemCertPool()
 	if c.certPool == nil {
 		logrus.Debug("failed to load cert pool.... Creating new cert pool")
@@ -33,6 +36,7 @@ func (c *clientHTTP) addTrustBundle(pemFilePath string) error {
 			return errors.Wrapf(err, "unable to load local certificate: %s", pemFilePath)
 		}
 		logrus.Debugf("loaded %s into the system pool: ", pemFilePath)
+		engineConfig.CABundle = strings.TrimSpace(string(pem))
 	}
 	return nil
 }
@@ -48,11 +52,17 @@ func (c *clientHTTP) downloadFile() error {
 	}
 
 	if c.saveFilePath == "" {
-		return errors.New("saveFilePath must be specificed")
+		return errors.New("saveFilePath must be specified")
 	}
 
 	client := &http.Client{Transport: tr}
 	resp, err := client.Get(c.urlAddr)
+
+	switch resp.StatusCode {
+	case http.StatusNotFound:
+		return fmt.Errorf("%s: %w", c.urlAddr, errHTTPNotFound)
+	}
+
 	if err != nil {
 		return err
 	}
@@ -96,15 +106,25 @@ func (c *clientHTTP) checkURLResponse() error {
 // The password provided will be added in the Config struct.
 // If an error happens, it will ask again username for users.
 func askPassword(c *Config) error {
+	origPwdTpl := survey.PasswordQuestionTemplate
+	survey.PasswordQuestionTemplate = `
+{{- if .ShowHelp }}{{- color "cyan"}}{{ HelpIcon }} {{ .Help }}{{color "reset"}}{{"\n"}}{{end}}
+{{- color "green+hb"}}{{ QuestionIcon }} {{color "reset"}}
+{{- color "default+hb"}}{{ .Message }} {{color "reset"}}
+{{- if and .Help (not .ShowHelp)}}{{color "cyan"}}[Press Ctrl+C to switch username, {{ HelpInputRune }} for help]{{color "reset"}} {{end}}`
+
 	err := survey.Ask([]*survey.Question{
 		{
 			Prompt: &survey.Password{
 				Message: "Engine password",
-				Help:    "",
+				Help:    "Password for the choosen username",
 			},
 			Validate: survey.ComposeValidators(survey.Required, authenticated(c)),
 		},
 	}, &c.Password)
+
+	survey.PasswordQuestionTemplate = origPwdTpl
+
 	if err != nil {
 		return err
 	}
@@ -131,6 +151,23 @@ func askUsername(c *Config) error {
 	}
 
 	return nil
+}
+
+// askQuestionTrueOrFalse generic function to ask question to users which
+// requires true (Yes) or false (No) as answer
+func askQuestionTrueOrFalse(question string, helpMessage string) (bool, error) {
+	value := false
+	err := survey.AskOne(
+		&survey.Confirm{
+			Message: question,
+			Help:    helpMessage,
+		},
+		&value, survey.Required)
+	if err != nil {
+		return value, err
+	}
+
+	return value, nil
 }
 
 // askCredentials will handle username and password for connecting with Engine
@@ -210,11 +247,19 @@ func engineSetup() (Config, error) {
 	httpResource.skipVerify = true
 	httpResource.urlAddr = engineConfig.PemURL
 	err = httpResource.downloadFile()
+	if errors.Is(err, errHTTPNotFound) {
+		return engineConfig, err
+	}
+
 	if err != nil {
 		logrus.Warning("cannot download PEM file from Engine!", err)
+		answer, err := askQuestionTrueOrFalse("Would you like to continue?", "By not using a trusted CA, insecure connections can cause man-in-the-middle attacks among many others.")
+		if !answer {
+			return engineConfig, err
+		}
 		engineConfig.Insecure = true
 	} else {
-		err = httpResource.addTrustBundle(httpResource.saveFilePath)
+		err = httpResource.addTrustBundle(httpResource.saveFilePath, &engineConfig)
 		if err != nil {
 			engineConfig.Insecure = true
 		} else {

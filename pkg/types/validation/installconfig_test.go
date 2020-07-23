@@ -5,7 +5,6 @@ import (
 	"net"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -20,7 +19,6 @@ import (
 	"github.com/openshift/installer/pkg/types/libvirt"
 	"github.com/openshift/installer/pkg/types/none"
 	"github.com/openshift/installer/pkg/types/openstack"
-	"github.com/openshift/installer/pkg/types/openstack/validation/mock"
 	"github.com/openshift/installer/pkg/types/ovirt"
 	"github.com/openshift/installer/pkg/types/vsphere"
 )
@@ -476,23 +474,6 @@ func TestValidateInstallConfig(t *testing.T) {
 			}(),
 		},
 		{
-			name: "invalid compute",
-			installConfig: func() *types.InstallConfig {
-				c := validInstallConfig()
-				c.Compute = []types.MachinePool{
-					func() types.MachinePool {
-						p := *validMachinePool("worker")
-						p.Platform = types.MachinePoolPlatform{
-							OpenStack: &openstack.MachinePool{},
-						}
-						return p
-					}(),
-				}
-				return c
-			}(),
-			expectedError: `^compute\[0\]\.platform\.openstack: Invalid value: openstack\.MachinePool{.*}: cannot specify "openstack" for machine pool when cluster is using "aws"$`,
-		},
-		{
 			name: "missing platform",
 			installConfig: func() *types.InstallConfig {
 				c := validInstallConfig()
@@ -571,10 +552,10 @@ func TestValidateInstallConfig(t *testing.T) {
 				c.Platform = types.Platform{
 					OpenStack: validOpenStackPlatform(),
 				}
-				c.Platform.OpenStack.Cloud = ""
+				c.Platform.OpenStack.APIVIP = "123.456.789.000"
 				return c
 			}(),
-			expectedError: `^platform\.openstack\.cloud: Unsupported value: "": supported values: "test-cloud"$`,
+			expectedError: `^platform\.openstack\.apiVIP: Invalid value: "123.456.789.000": "123.456.789.000" is not a valid IP$`,
 		},
 		{
 			name: "valid baremetal platform",
@@ -903,6 +884,17 @@ func TestValidateInstallConfig(t *testing.T) {
 			}(),
 			expectedError: `Invalid value: "DualStack": dual-stack IPv4/IPv6 is not supported for this platform, specify only one type of address`,
 		},
+		{
+			name: "invalid IPv6 hostprefix",
+			installConfig: func() *types.InstallConfig {
+				c := validInstallConfig()
+				c.Platform = types.Platform{None: &none.Platform{}}
+				c.Networking = validIPv6NetworkingConfig()
+				c.Networking.ClusterNetwork[0].HostPrefix = 72
+				return c
+			}(),
+			expectedError: `Invalid value: 72: cluster network host subnetwork prefix must be 64 for IPv6 networks`,
+		},
 
 		{
 			name: "valid ovirt platform",
@@ -932,20 +924,47 @@ func TestValidateInstallConfig(t *testing.T) {
 			}(),
 			expectedError: `^compute\[0\].architecture: Invalid value: "ppc64le": heteregeneous multi-arch is not supported; compute pool architecture must match control plane$`,
 		},
+		{
+			name: "valid cloud credentials mode",
+			installConfig: func() *types.InstallConfig {
+				c := validInstallConfig()
+				c.CredentialsMode = types.PassthroughCredentialsMode
+				return c
+			}(),
+		},
+		{
+			name: "unsupported manual cloud credentials mode",
+			installConfig: func() *types.InstallConfig {
+				c := validInstallConfig()
+				c.Platform = types.Platform{GCP: validGCPPlatform()}
+				c.CredentialsMode = types.ManualCredentialsMode
+				return c
+			}(),
+			expectedError: `^credentialsMode: Unsupported value: "manual": supported values: "mint", "passthrough"$`,
+		},
+		{
+			name: "invalidly set cloud credentials mode",
+			installConfig: func() *types.InstallConfig {
+				c := validInstallConfig()
+				c.Platform = types.Platform{BareMetal: validBareMetalPlatform()}
+				c.CredentialsMode = types.PassthroughCredentialsMode
+				return c
+			}(),
+			expectedError: `^credentialsMode: Invalid value: "passthrough": cannot be set when using the "baremetal" platform$`,
+		},
+		{
+			name: "bad cloud credentials mode",
+			installConfig: func() *types.InstallConfig {
+				c := validInstallConfig()
+				c.CredentialsMode = "bad-mode"
+				return c
+			}(),
+			expectedError: `^credentialsMode: Unsupported value: "bad-mode": supported values: "manual", "mint", "passthrough"$`,
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
-
-			fetcher := mock.NewMockValidValuesFetcher(mockCtrl)
-			fetcher.EXPECT().GetCloudNames().Return([]string{"test-cloud"}, nil).AnyTimes()
-			fetcher.EXPECT().GetNetworkNames(gomock.Any()).Return([]string{"test-network"}, nil).AnyTimes()
-			fetcher.EXPECT().GetFlavorNames(gomock.Any()).Return([]string{"test-flavor"}, nil).AnyTimes()
-			fetcher.EXPECT().GetNetworkExtensionsAliases(gomock.Any()).Return([]string{"trunk"}, nil).AnyTimes()
-			fetcher.EXPECT().GetServiceCatalog(gomock.Any()).Return([]string{"octavia"}, nil).AnyTimes()
-
-			err := ValidateInstallConfig(tc.installConfig, fetcher).ToAggregate()
+			err := ValidateInstallConfig(tc.installConfig).ToAggregate()
 			if tc.expectedError == "" {
 				assert.NoError(t, err)
 			} else {

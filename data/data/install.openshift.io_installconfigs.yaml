@@ -4,7 +4,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: (devel)
+    controller-gen.kubebuilder.io/version: v0.3.1-0.20200617211605-651903477185
   creationTimestamp: null
   name: installconfigs.install.openshift.io
 spec:
@@ -609,6 +609,28 @@ spec:
             - name
             - platform
             type: object
+          credentialsMode:
+            description: "CredentialsMode is used to explicitly set the mode with
+              which CredentialRequests are satisfied. \n If this field is set, then
+              the installer will not attempt to query the cloud permissions before
+              attempting installation. If the field is not set or empty, then the
+              installer will perform its normal verification that the credentials
+              provided are sufficient to perform an installation. \n There are three
+              possible values for this field, but the valid values are dependent upon
+              the platform being used. \"mint\": create new credentials with a subset
+              of the overall permissions for each CredentialsRequest \"passthrough\":
+              copy the credentials with all of the overall permsissions for each CredentialsRequest
+              \"manual\": CredentialsRequests must be handled manually by the user
+              \n For each of the following platforms, the field can set to the specified
+              values. For all other platforms, the field must not be set. AWS: \"mint\",
+              \"passthrough\", \"manual\" Azure: \"mint\", \"passthrough\" GCP: \"mint\",
+              \"passthrough\""
+            enum:
+            - ""
+            - mint
+            - passthrough
+            - manual
+            type: string
           fips:
             default: false
             description: FIPS configures https://www.nist.gov/itl/fips-general-information
@@ -994,6 +1016,53 @@ spec:
                           type: string
                         role:
                           type: string
+                        rootDeviceHints:
+                          description: RootDeviceHints holds the hints for specifying
+                            the storage location for the root filesystem for the image.
+                          properties:
+                            deviceName:
+                              description: A Linux device name like "/dev/vda". The
+                                hint must match the actual value exactly.
+                              type: string
+                            hctl:
+                              description: A SCSI bus address like 0:0:0:0. The hint
+                                must match the actual value exactly.
+                              type: string
+                            minSizeGigabytes:
+                              description: The minimum size of the device in Gigabytes.
+                              minimum: 0
+                              type: integer
+                            model:
+                              description: A vendor-specific device identifier. The
+                                hint can be a substring of the actual value.
+                              type: string
+                            rotational:
+                              description: True if the device should use spinning
+                                media, false otherwise.
+                              type: boolean
+                            serialNumber:
+                              description: Device serial number. The hint must match
+                                the actual value exactly.
+                              type: string
+                            vendor:
+                              description: The name of the vendor or manufacturer
+                                of the device. The hint can be a substring of the
+                                actual value.
+                              type: string
+                            wwn:
+                              description: Unique storage identifier. The hint must
+                                match the actual value exactly.
+                              type: string
+                            wwnVendorExtension:
+                              description: Unique vendor storage identifier. The hint
+                                must match the actual value exactly.
+                              type: string
+                            wwnWithExtension:
+                              description: Unique storage identifier with the vendor
+                                extension appended. The hint must match the actual
+                                value exactly.
+                              type: string
+                          type: object
                       required:
                       - bmc
                       - bootMACAddress
@@ -1097,6 +1166,16 @@ spec:
                           type: string
                         type: array
                     type: object
+                  licenses:
+                    description: Licenses is a list of licenses to apply to the compute
+                      images The value should a list of strings (https URLs only)
+                      representing the license keys. When set, this will cause the
+                      installer to copy the image into user's project. This option
+                      is incompatible with any mechanism that makes use of pre-built
+                      images such as the current env OPENSHIFT_INSTALL_OS_IMAGE_OVERRIDE
+                    items:
+                      type: string
+                    type: array
                   network:
                     description: Network specifies an existing VPC where the cluster
                       should be created rather than provisioning a new one.
@@ -1220,6 +1299,11 @@ spec:
                     description: ExternalNetwork is name of the external network in
                       your OpenStack cluster.
                     type: string
+                  ingressFloatingIP:
+                    description: IngressFloatingIP is the ID of an available floating
+                      IP in your OpenStack cluster that will be associated with the
+                      OpenShift ingress port
+                    type: string
                   ingressVIP:
                     description: 'IngressVIP is the static IP on the nodes subnet
                       that the apps port for openshift will be assigned Default: will
@@ -1238,8 +1322,9 @@ spec:
                       will not be deleted or modified by the installer.
                     type: string
                   octaviaSupport:
-                    description: OctaviaSupport holds a `0` or `1` value that indicates
+                    description: 'OctaviaSupport holds a `0` or `1` value that indicates
                       whether your OpenStack cluster supports Octavia Loadbalancing.
+                      Deprecated: this value is set by the installer automatically.'
                     type: string
                   region:
                     description: 'Region specifies the OpenStack region where the
@@ -1247,14 +1332,13 @@ spec:
                       by the installer.'
                     type: string
                   trunkSupport:
-                    description: TrunkSupport holds a `0` or `1` value that indicates
+                    description: 'TrunkSupport holds a `0` or `1` value that indicates
                       whether or not to use trunk ports in your OpenShift cluster.
+                      Deprecated: this value is set by the installer automatically.'
                     type: string
                 required:
                 - cloud
                 - computeFlavor
-                - externalNetwork
-                - lbFloatingIP
                 - octaviaSupport
                 - region
                 - trunkSupport
@@ -1475,5 +1559,5 @@ status:
   acceptedNames:
     kind: ""
     plural: ""
-  conditions: []
-  storedVersions: []
+  conditions: null
+  storedVersions: null

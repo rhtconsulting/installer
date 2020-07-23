@@ -134,13 +134,19 @@ platform should be considered experimental and still subject to change without
 backwards compatibility.  In particular, some items likely to change soon
 include:
 
-* The `hardwareProfile` is currently exposed as a way to allow specifying
+* **This field is deprecated. See rootDeviceHints instead.**
+  The `hardwareProfile` is currently exposed as a way to allow specifying
   different hardware parameters for deployment.  By default, we will deploy
   RHCOS to the first disk, but that may not be appropriate for all hardware.
   The `hardwareProfile` is the field we have available to change that.  This
   interface is subject to change.  In the meantime, hardware profiles can be
   found here:
   https://github.com/metal3-io/baremetal-operator/blob/master/pkg/hardware/profile.go#L48
+
+* *rootDeviceHints* -- Guidance for how to choose the device to
+  receive the image being provisioned. Documentation on using this field can
+  be found here
+  https://github.com/metal3-io/baremetal-operator/blob/master/docs/api.md
 
 ```yaml
 apiVersion: v1
@@ -171,7 +177,8 @@ platform:
           username: admin
           password: password
         bootMACAddress: 00:11:07:4e:f6:68
-        hardwareProfile: default
+        rootDeviceHints:
+          minSizeGigabytes: 20
       - name: openshift-master-1
         role: master
         bmc:
@@ -179,7 +186,8 @@ platform:
           username: admin
           password: password
         bootMACAddress: 00:11:07:4e:f6:6c
-        hardwareProfile: default
+        rootDeviceHints:
+          minSizeGigabytes: 20
       - name: openshift-master-2
         role: master
         bmc:
@@ -187,7 +195,8 @@ platform:
           username: admin
           password: password
         bootMACAddress: 00:11:07:4e:f6:70
-        hardwareProfile: default
+        rootDeviceHints:
+          minSizeGigabytes: 20
       - name: openshift-worker-0
         role: worker
         bmc:
@@ -195,7 +204,8 @@ platform:
           username: admin
           password: password
         bootMACAddress: 00:11:07:4e:f6:71
-        hardwareProfile: default
+        rootDeviceHints:
+          minSizeGigabytes: 20
 pullSecret: ...
 sshKey: ...
 ```
@@ -276,21 +286,6 @@ instead of the leaving the existing issues against the KNI fork of the installer
 platform.
 
 https://github.com/openshift-metal3/kni-installer/issues/74
-
-### install gather not supported
-
-When an installation fails, `openshift-install` will attempt to gather debug
-information from hosts.  This is not yet supported by the `baremetal` platform.
-
-https://github.com/openshift-metal3/kni-installer/issues/79
-
-### Provisioning subnet not fully configurable
-
-There are some install-config parameters to control templating of the provisioning
-network configuration, but fully supporting alternative subnets for the
-provisioning network is incomplete.
-
-https://github.com/openshift/installer/issues/2091
 
 ## Troubleshooting
 

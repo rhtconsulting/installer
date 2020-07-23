@@ -29,6 +29,12 @@ variable "lb_floating_ip" {
   default     = ""
 }
 
+variable "ingress_floating_ip" {
+  description = "(optional) Existing floating IP address to attach to the ingress port created by the installer."
+  type        = string
+  default     = ""
+}
+
 variable "masters_count" {
   type = string
 }
@@ -46,11 +52,11 @@ variable "external_dns" {
 }
 
 variable "trunk_support" {
-  type = string
+  type = bool
 }
 
 variable "octavia_support" {
-  type = string
+  type = bool
 }
 
 variable "machines_subnet_id" {
