@@ -8,7 +8,7 @@ import (
         "os/exec"
 
 	"github.com/openshift/installer/pkg/asset"
-//	"github.com/openshift/installer/pkg/types"
+	"github.com/openshift/installer/pkg/types"
 
 )
 
@@ -35,10 +35,14 @@ func (a *mirrorReleaseMetaData) Name() string {
 }
 
 
-func (a *mirrorReleaseMetaData) pullMirrorImages() bool { //config *types.OfflineConfig) bool {
+func (a *mirrorReleaseMetaData) pullMirrorImages(config *types.OfflineConfig) bool {
 	fmt.Println("Pulling mirror images for OCP 4 mirror")
 
-	command := exec.Command("/usr/local/bin/oc", "adm", "-a", "/opt/registry/auth/local-secret.txt", "release", "mirror", "--from=quay.io/openshift-release-dev/ocp-release:4.4.0-x86_64", "--to=file://openshift/release", "--to-dir=/ocp-images")
+	source := "--from=" + config.Ocpmirror.Src
+	dest   := "--to-dir=" + config.Ocpmirror.Dest
+
+	command := exec.Command(config.Ocpmirror.Ocbin, "adm", "-a", config.Ocpmirror.Pullsecret, "release", "mirror", source, "--to=file://openshift/release", dest)
+
 	var out bytes.Buffer
 	command.Stdout = &out
 	err := command.Run()
@@ -48,14 +52,17 @@ func (a *mirrorReleaseMetaData) pullMirrorImages() bool { //config *types.Offlin
 		log.Fatal(err)
 	}
 	fmt.Printf("Command Output: %s\n", out.String())
-	fmt.Println("pullMirrorImages called!")
 	return true
 }
 
-func (a *mirrorReleaseMetaData) extractInstaller() bool { //config *types.OfflineConfig) bool {
+func (a *mirrorReleaseMetaData) extractInstaller(config *types.OfflineConfig) bool {
 	fmt.Println("Extracting OCP 4 installer from mirror images")
 
-	command := exec.Command("/usr/local/bin/oc", "adm", "-a", "/opt/registry/auth/local-secret.txt", "release", "extract", "--command=openshift-install", "--from=quay.io/openshift-release-dev/ocp-release:4.4.0-x86_64", "--to=/ocp-images")
+	source := "--from=" + config.Ocpmirror.Src
+	dest   := "--to=" + config.Ocpmirror.Dest
+
+	command := exec.Command(config.Ocpmirror.Ocbin, "adm", "-a", config.Ocpmirror.Pullsecret, "release", "extract", "--command=openshift-install", source, dest)
+
 	var out bytes.Buffer
 	command.Stdout = &out
 	err := command.Run()
@@ -68,4 +75,3 @@ func (a *mirrorReleaseMetaData) extractInstaller() bool { //config *types.Offlin
 	fmt.Println("extractInstaller called!")
 	return true
 }
-

@@ -94,10 +94,9 @@ func (a *rhcosReleaseMetaData) createOfflinePackage(src string, dest string) boo
 		}
 		check(re)
 	}
+	
 	bar.PrintComplete()
 	quit <- true
-
-
 
 	return true
 }
