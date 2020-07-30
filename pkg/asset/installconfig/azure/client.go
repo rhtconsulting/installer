@@ -23,6 +23,8 @@ type API interface {
 	ListLocations(ctx context.Context) (*[]azsubs.Location, error)
 	GetResourcesProvider(ctx context.Context, resourceProviderNamespace string) (*azres.Provider, error)
 	GetDiskSkus(ctx context.Context, region string) ([]azsku.ResourceSku, error)
+	GetGroup(ctx context.Context, groupName string) (*azres.Group, error)
+	ListResourceIDsByGroup(ctx context.Context, groupName string) ([]string, error)
 }
 
 // Client makes calls to the Azure API.
@@ -86,14 +88,14 @@ func (c *Client) GetControlPlaneSubnet(ctx context.Context, resourceGroupName, v
 
 // getVnetsClient sets up a new client to retrieve vnets
 func (c *Client) getVirtualNetworksClient(ctx context.Context) (*aznetwork.VirtualNetworksClient, error) {
-	vnetsClient := aznetwork.NewVirtualNetworksClient(c.ssn.Credentials.SubscriptionID)
+	vnetsClient := aznetwork.NewVirtualNetworksClientWithBaseURI(c.ssn.Environment.ResourceManagerEndpoint, c.ssn.Credentials.SubscriptionID)
 	vnetsClient.Authorizer = c.ssn.Authorizer
 	return &vnetsClient, nil
 }
 
 // getSubnetsClient sets up a new client to retrieve a subnet
 func (c *Client) getSubnetsClient(ctx context.Context) (*aznetwork.SubnetsClient, error) {
-	subnetClient := aznetwork.NewSubnetsClient(c.ssn.Credentials.SubscriptionID)
+	subnetClient := aznetwork.NewSubnetsClientWithBaseURI(c.ssn.Environment.ResourceManagerEndpoint, c.ssn.Credentials.SubscriptionID)
 	subnetClient.Authorizer = c.ssn.Authorizer
 	return &subnetClient, nil
 }
@@ -118,7 +120,7 @@ func (c *Client) ListLocations(ctx context.Context) (*[]azsubs.Location, error) 
 
 // getSubscriptionsClient sets up a new client to retrieve subscription data
 func (c *Client) getSubscriptionsClient(ctx context.Context) (azsubs.Client, error) {
-	client := azsubs.NewClient()
+	client := azsubs.NewClientWithBaseURI(c.ssn.Environment.ResourceManagerEndpoint)
 	client.Authorizer = c.ssn.Authorizer
 	return client, nil
 }
@@ -143,14 +145,14 @@ func (c *Client) GetResourcesProvider(ctx context.Context, resourceProviderNames
 
 // getProvidersClient sets up a new client to retrieve providers data
 func (c *Client) getProvidersClient(ctx context.Context) (azres.ProvidersClient, error) {
-	client := azres.NewProvidersClient(c.ssn.Credentials.SubscriptionID)
+	client := azres.NewProvidersClientWithBaseURI(c.ssn.Environment.ResourceManagerEndpoint, c.ssn.Credentials.SubscriptionID)
 	client.Authorizer = c.ssn.Authorizer
 	return client, nil
 }
 
 // GetDiskSkus returns all the disk SKU pages for a given region.
 func (c *Client) GetDiskSkus(ctx context.Context, region string) ([]azsku.ResourceSku, error) {
-	client := azsku.NewResourceSkusClient(c.ssn.Credentials.SubscriptionID)
+	client := azsku.NewResourceSkusClientWithBaseURI(c.ssn.Environment.ResourceManagerEndpoint, c.ssn.Credentials.SubscriptionID)
 	client.Authorizer = c.ssn.Authorizer
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
@@ -175,4 +177,37 @@ func (c *Client) GetDiskSkus(ctx context.Context, region string) ([]azsku.Resour
 	}
 
 	return nil, errors.Errorf("no disks for specified subscription in region %s", region)
+}
+
+// GetGroup returns resource group for the groupName.
+func (c *Client) GetGroup(ctx context.Context, groupName string) (*azres.Group, error) {
+	client := azres.NewGroupsClientWithBaseURI(c.ssn.Environment.ResourceManagerEndpoint, c.ssn.Credentials.SubscriptionID)
+	client.Authorizer = c.ssn.Authorizer
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	res, err := client.Get(ctx, groupName)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get resource group")
+	}
+	return &res, nil
+}
+
+// ListResourceIDsByGroup returns a list of resource IDs for resource group groupName.
+func (c *Client) ListResourceIDsByGroup(ctx context.Context, groupName string) ([]string, error) {
+	client := azres.NewClientWithBaseURI(c.ssn.Environment.ResourceManagerEndpoint, c.ssn.Credentials.SubscriptionID)
+	client.Authorizer = c.ssn.Authorizer
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	var res []string
+	for resPage, err := client.ListByResourceGroup(ctx, groupName, "", "", nil); resPage.NotDone(); err = resPage.NextWithContext(ctx) {
+		if err != nil {
+			return nil, errors.Wrap(err, "error fetching resource pages")
+		}
+		for _, page := range resPage.Values() {
+			res = append(res, to.String(page.ID))
+		}
+	}
+	return res, nil
 }

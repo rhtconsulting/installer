@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	igntypes "github.com/coreos/ignition/config/v2_2/types"
+	igntypes "github.com/coreos/ignition/v2/config/v3_1/types"
 	gcpprovider "github.com/openshift/cluster-api-provider-gcp/pkg/apis/gcpprovider/v1beta1"
 	libvirtprovider "github.com/openshift/cluster-api-provider-libvirt/pkg/apis/libvirtproviderconfig/v1beta1"
 	ovirtprovider "github.com/openshift/cluster-api-provider-ovirt/pkg/apis/ovirtprovider/v1beta1"
@@ -31,6 +31,7 @@ import (
 	"github.com/openshift/installer/pkg/asset/machines"
 	"github.com/openshift/installer/pkg/asset/openshiftinstall"
 	"github.com/openshift/installer/pkg/asset/rhcos"
+	rhcospkg "github.com/openshift/installer/pkg/rhcos"
 	"github.com/openshift/installer/pkg/tfvars"
 	awstfvars "github.com/openshift/installer/pkg/tfvars/aws"
 	azuretfvars "github.com/openshift/installer/pkg/tfvars/azure"
@@ -279,6 +280,7 @@ func (t *TerraformVariables) Generate(parents asset.Parents) error {
 			azuretfvars.TFVarsSources{
 				Auth:                        auth,
 				CloudName:                   installConfig.Config.Azure.CloudName,
+				ResourceGroupName:           installConfig.Config.Azure.ResourceGroupName,
 				BaseDomainResourceGroupName: installConfig.Config.Azure.BaseDomainResourceGroupName,
 				MasterConfigs:               masterConfigs,
 				WorkerConfigs:               workerConfigs,
@@ -327,12 +329,17 @@ func (t *TerraformVariables) Generate(parents asset.Parents) error {
 			publicZoneName = publicZone.Name
 		}
 		preexistingnetwork := installConfig.Config.GCP.Network != ""
+
+		imageRaw, err := rhcospkg.GCPRaw(ctx, installConfig.Config.ControlPlane.Architecture)
+		if err != nil {
+			return errors.Wrap(err, "failed to find Raw GCP image URL")
+		}
 		data, err := gcptfvars.TFVars(
 			gcptfvars.TFVarsSources{
 				Auth:               auth,
 				MasterConfigs:      masterConfigs,
 				WorkerConfigs:      workerConfigs,
-				ImageURI:           string(*rhcosImage),
+				ImageURI:           imageRaw,
 				ImageLicenses:      installConfig.Config.GCP.Licenses,
 				PublicZoneName:     publicZoneName,
 				PublishStrategy:    installConfig.Config.Publish,
@@ -554,7 +561,7 @@ func injectInstallInfo(bootstrap []byte) (string, error) {
 
 	config.Storage.Files = append(config.Storage.Files, ignition.FileFromString("/opt/openshift/manifests/openshift-install.yaml", "root", 0644, cm))
 
-	ign, err := json.Marshal(config)
+	ign, err := ignition.Marshal(config)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to marshal bootstrap Ignition config")
 	}

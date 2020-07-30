@@ -218,19 +218,14 @@ $ rm -f openshift/99_openshift-cluster-api_master-machines-*.yaml openshift/99_o
 
 #### Check Folder Name in Cloud Provider Manifest
 
-An absolute path to the cluster VM folder is specified in the `cloud-provider-config.yaml` manifest. The vSphere Cloud Provider uses the specified folder for cluster operations, such as provisioning volumes. By default, the
-folder name is specified as the cluster id:
+An absolute path to the cluster VM folder is specified in the `cloud-provider-config.yaml` manifest. The vSphere Cloud Provider uses the specified folder for cluster operations, such as provisioning volumes. The folder path can be specified in the install-config (see [customization.md](customization.md)) or the default value will be a top-level folder named with the infrastructure ID.
 
 ```console
 $ cat vsphere-test/manifests/cloud-provider-config.yaml | grep folder
     folder = "/<datacenter>/vm/test-kndtw"
 ```
 
-You must either:
-* change this value to match the absolute path of your VM folder; OR
-* create a VM folder at this path named with the cluster ID
-
-Note: `folder` may be specified in the install config, and this value will automatically be updated to match the provided value. See [customization.md](customization.md) for more details.
+For successful cluster operation, VMs will need to be created in a folder matching the path specified in the cloud-provider config.
 
 ### Invoking the installer to get Ignition configs
 
@@ -274,20 +269,14 @@ The Ignition config created by the OpenShift Installer cannot be used directly b
 {
   "ignition": {
     "config": {
-      "append": [
+      "merge": [
         {
           "source": "bootstrap_ignition_config_url",
-          "verification": {}
         }
       ]
     },
-    "timeouts": {},
-    "version": "2.1.0"
+    "version": "3.1.0"
   },
-  "networkd": {},
-  "passwd": {},
-  "storage": {},
-  "systemd": {}
 }
 ```
 ### Hostname
@@ -301,28 +290,19 @@ For example, the following Ignition config will create a hostname file that sets
 ```json
 {
   "ignition": {
-    "config": {},
-    "timeouts": {},
-    "version": "2.1.0"
+    "version": "3.1.0"
   },
-  "networkd": {},
-  "passwd": {},
   "storage": {
     "files": [
       {
-        "filesystem": "root",
-        "group": {},
         "path": "/etc/hostname",
-        "user": {},
         "contents": {
           "source": "data:text/plain;charset=utf-8,control-plane-0",
-          "verification": {}
         },
         "mode": 420
       }
     ]
   },
-  "systemd": {}
 }
 ```
 
@@ -335,28 +315,19 @@ For example, the following Ignition config will create an ifcfg file that sets t
 ```json
 {
   "ignition": {
-    "config": {},
-    "timeouts": {},
-    "version": "2.1.0"
+    "version": "3.1.0"
   },
-  "networkd": {},
-  "passwd": {},
   "storage": {
     "files": [
       {
-        "filesystem": "root",
-        "group": {},
         "path": "/etc/sysconfig/network-scripts/ifcfg-ens192",
-        "user": {},
         "contents": {
           "source": "data:text/plain;charset=utf-8;base64,VFlQRT1FdGhlcm5ldApCT09UUFJPVE89bm9uZQpOQU1FPWVuczE5MgpERVZJQ0U9ZW5zMTkyCk9OQk9PVD15ZXMKSVBBRERSPTEwLjAuMC4yClBSRUZJWD0yNApHQVRFV0FZPTEwLjAuMC4xCkRPTUFJTj1teWRvbWFpbi5jb20KRE5TMT04LjguOC44",
-          "verification": {}
         },
         "mode": 420
       }
     ]
   },
-  "systemd": {}
 }
 ```
 
