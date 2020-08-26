@@ -95,6 +95,7 @@ func validBareMetalPlatform() *baremetal.Platform {
 		ProvisioningNetworkCIDR:      ipnet.MustParseCIDR("192.168.111.0/24"),
 		BootstrapProvisioningIP:      "192.168.111.1",
 		ClusterProvisioningIP:        "192.168.111.2",
+		ProvisioningNetwork:          baremetal.ManagedProvisioningNetwork,
 		Hosts: []*baremetal.Host{
 			{
 				Name:           "host1",
@@ -405,6 +406,27 @@ func TestValidateInstallConfig(t *testing.T) {
 			expectedError: `^networking\.clusterNetwork\[0]\.hostPrefix: Invalid value: 23: cluster network host subnetwork prefix must not be larger size than CIDR 192.168.1.0/24$`,
 		},
 		{
+			name: "cluster network host prefix unset",
+			installConfig: func() *types.InstallConfig {
+				c := validInstallConfig()
+				c.Networking.NetworkType = "OpenShiftSDN"
+				c.Networking.ClusterNetwork[0].CIDR = *ipnet.MustParseCIDR("192.168.1.0/24")
+				c.Networking.ClusterNetwork[0].HostPrefix = 0
+				return c
+			}(),
+			expectedError: `^networking\.clusterNetwork\[0]\.hostPrefix: Invalid value: 0: cluster network host subnetwork prefix must not be larger size than CIDR 192.168.1.0/24$`,
+		},
+		{
+			name: "cluster network host prefix unset ignored",
+			installConfig: func() *types.InstallConfig {
+				c := validInstallConfig()
+				c.Networking.NetworkType = "HostPrefixNotRequiredPlugin"
+				c.Networking.ClusterNetwork[0].CIDR = *ipnet.MustParseCIDR("192.168.1.0/24")
+				return c
+			}(),
+			expectedError: ``,
+		},
+		{
 			name: "missing control plane",
 			installConfig: func() *types.InstallConfig {
 				c := validInstallConfig()
@@ -577,7 +599,7 @@ func TestValidateInstallConfig(t *testing.T) {
 				c.Platform.BareMetal.APIVIP = ""
 				return c
 			}(),
-			expectedError: `^\[platform\.baremetal\.apiVIP: Invalid value: "": "" is not a valid IP, platform\.baremetal\.apiVIP: Invalid value: "": the virtual IP is expected to be in one of the machine networks]$`,
+			expectedError: `^\[platform\.baremetal\.apiVIP: Invalid value: "": "" is not a valid IP, platform\.baremetal\.apiVIP: Invalid value: "": IP expected to be in one of the machine networks: 10.0.0.0/16]$`,
 		},
 		{
 			name: "baremetal API VIP not an IP",
@@ -589,7 +611,7 @@ func TestValidateInstallConfig(t *testing.T) {
 				c.Platform.BareMetal.APIVIP = "test"
 				return c
 			}(),
-			expectedError: `^\[platform\.baremetal\.apiVIP: Invalid value: "test": "test" is not a valid IP, platform\.baremetal\.apiVIP: Invalid value: "test": the virtual IP is expected to be in one of the machine networks]$`,
+			expectedError: `^\[platform\.baremetal\.apiVIP: Invalid value: "test": "test" is not a valid IP, platform\.baremetal\.apiVIP: Invalid value: "test": IP expected to be in one of the machine networks: 10.0.0.0/16]$`,
 		},
 		{
 			name: "baremetal API VIP set to an incorrect value",
@@ -601,7 +623,7 @@ func TestValidateInstallConfig(t *testing.T) {
 				c.Platform.BareMetal.APIVIP = "10.1.0.5"
 				return c
 			}(),
-			expectedError: `^platform\.baremetal\.apiVIP: Invalid value: "10\.1\.0\.5": the virtual IP is expected to be in one of the machine networks$`,
+			expectedError: `^platform\.baremetal\.apiVIP: Invalid value: "10\.1\.0\.5": IP expected to be in one of the machine networks: 10.0.0.0/16$`,
 		},
 		{
 			name: "baremetal Ingress VIP not an IP",
@@ -613,7 +635,7 @@ func TestValidateInstallConfig(t *testing.T) {
 				c.Platform.BareMetal.IngressVIP = "test"
 				return c
 			}(),
-			expectedError: `^\[platform\.baremetal\.ingressVIP: Invalid value: "test": "test" is not a valid IP, platform\.baremetal\.ingressVIP: Invalid value: "test": the virtual IP is expected to be in one of the machine networks]$`,
+			expectedError: `^\[platform\.baremetal\.ingressVIP: Invalid value: "test": "test" is not a valid IP, platform\.baremetal\.ingressVIP: Invalid value: "test": IP expected to be in one of the machine networks: 10.0.0.0/16]$`,
 		},
 		{
 			name: "baremetal Ingress VIP set to an incorrect value",
@@ -625,7 +647,7 @@ func TestValidateInstallConfig(t *testing.T) {
 				c.Platform.BareMetal.IngressVIP = "10.1.0.7"
 				return c
 			}(),
-			expectedError: `^platform\.baremetal\.ingressVIP: Invalid value: "10\.1\.0\.7": the virtual IP is expected to be in one of the machine networks$`,
+			expectedError: `^platform\.baremetal\.ingressVIP: Invalid value: "10\.1\.0\.7": IP expected to be in one of the machine networks: 10.0.0.0/16$`,
 		}, {
 			name: "valid vsphere platform",
 			installConfig: func() *types.InstallConfig {
@@ -940,7 +962,7 @@ func TestValidateInstallConfig(t *testing.T) {
 				c.CredentialsMode = types.ManualCredentialsMode
 				return c
 			}(),
-			expectedError: `^credentialsMode: Unsupported value: "manual": supported values: "mint", "passthrough"$`,
+			expectedError: `^credentialsMode: Unsupported value: "Manual": supported values: "Mint", "Passthrough"$`,
 		},
 		{
 			name: "invalidly set cloud credentials mode",
@@ -950,7 +972,7 @@ func TestValidateInstallConfig(t *testing.T) {
 				c.CredentialsMode = types.PassthroughCredentialsMode
 				return c
 			}(),
-			expectedError: `^credentialsMode: Invalid value: "passthrough": cannot be set when using the "baremetal" platform$`,
+			expectedError: `^credentialsMode: Invalid value: "Passthrough": cannot be set when using the "baremetal" platform$`,
 		},
 		{
 			name: "bad cloud credentials mode",
@@ -959,7 +981,26 @@ func TestValidateInstallConfig(t *testing.T) {
 				c.CredentialsMode = "bad-mode"
 				return c
 			}(),
-			expectedError: `^credentialsMode: Unsupported value: "bad-mode": supported values: "manual", "mint", "passthrough"$`,
+			expectedError: `^credentialsMode: Unsupported value: "bad-mode": supported values: "Manual", "Mint", "Passthrough"$`,
+		},
+		{
+			name: "allowed docker bridge with non-libvirt",
+			installConfig: func() *types.InstallConfig {
+				c := validInstallConfig()
+				c.Networking.MachineNetwork = []types.MachineNetworkEntry{{CIDR: *ipnet.MustParseCIDR("172.17.64.0/18")}}
+				return c
+			}(),
+			expectedError: ``,
+		},
+		{
+			name: "docker bridge not allowed with libvirt",
+			installConfig: func() *types.InstallConfig {
+				c := validInstallConfig()
+				c.Platform = types.Platform{Libvirt: validLibvirtPlatform()}
+				c.Networking.MachineNetwork = []types.MachineNetworkEntry{{CIDR: *ipnet.MustParseCIDR("172.17.64.0/18")}}
+				return c
+			}(),
+			expectedError: `\Q[networking.machineNewtork[0]: Invalid value: "172.17.64.0/18": overlaps with default Docker Bridge subnet, platform: Invalid value: "libvirt": must specify one of the platforms (\E.*\Q)]\E`,
 		},
 	}
 	for _, tc := range cases {

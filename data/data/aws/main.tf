@@ -30,7 +30,7 @@ module "bootstrap" {
   cluster_id               = var.cluster_id
   ignition                 = var.ignition_bootstrap
   ignition_bucket          = var.aws_ignition_bucket
-  ignition_presigned_url   = var.aws_ignition_presigned_url
+  ignition_stub            = var.aws_bootstrap_stub_ignition
   subnet_id                = var.aws_publish_strategy == "External" ? module.vpc.az_to_public_subnet_id[var.aws_master_availability_zones[0]] : module.vpc.az_to_private_subnet_id[var.aws_master_availability_zones[0]]
   target_group_arns        = module.vpc.aws_lb_target_group_arns
   target_group_arns_length = module.vpc.aws_lb_target_group_arns_length
@@ -87,6 +87,7 @@ module "dns" {
   cluster_id               = var.cluster_id
   tags                     = local.tags
   vpc_id                   = module.vpc.vpc_id
+  region                   = var.aws_region
   publish_strategy         = var.aws_publish_strategy
 }
 

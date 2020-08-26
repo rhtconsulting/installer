@@ -233,6 +233,14 @@ spec:
                           description: FlavorName defines the OpenStack Nova flavor.
                             eg. m1.large
                           type: string
+                        zones:
+                          description: Zones is the list of availability zones where
+                            the instances should be deployed. If no zones are provided,
+                            all instances will be deployed on OpenStack Nova default
+                            availability zone
+                          items:
+                            type: string
+                          type: array
                       required:
                       - type
                       type: object
@@ -520,6 +528,14 @@ spec:
                         description: FlavorName defines the OpenStack Nova flavor.
                           eg. m1.large
                         type: string
+                      zones:
+                        description: Zones is the list of availability zones where
+                          the instances should be deployed. If no zones are provided,
+                          all instances will be deployed on OpenStack Nova default
+                          availability zone
+                        items:
+                          type: string
+                        type: array
                     required:
                     - type
                     type: object
@@ -617,19 +633,19 @@ spec:
               installer will perform its normal verification that the credentials
               provided are sufficient to perform an installation. \n There are three
               possible values for this field, but the valid values are dependent upon
-              the platform being used. \"mint\": create new credentials with a subset
-              of the overall permissions for each CredentialsRequest \"passthrough\":
-              copy the credentials with all of the overall permsissions for each CredentialsRequest
-              \"manual\": CredentialsRequests must be handled manually by the user
+              the platform being used. \"Mint\": create new credentials with a subset
+              of the overall permissions for each CredentialsRequest \"Passthrough\":
+              copy the credentials with all of the overall permissions for each CredentialsRequest
+              \"Manual\": CredentialsRequests must be handled manually by the user
               \n For each of the following platforms, the field can set to the specified
-              values. For all other platforms, the field must not be set. AWS: \"mint\",
-              \"passthrough\", \"manual\" Azure: \"mint\", \"passthrough\" GCP: \"mint\",
-              \"passthrough\""
+              values. For all other platforms, the field must not be set. AWS: \"Mint\",
+              \"Passthrough\", \"Manual\" Azure: \"Mint\", \"Passthrough\" GCP: \"Mint\",
+              \"Passthrough\""
             enum:
             - ""
-            - mint
-            - passthrough
-            - manual
+            - Mint
+            - Passthrough
+            - Manual
             type: string
           fips:
             default: false
@@ -680,7 +696,8 @@ spec:
                     hostPrefix:
                       description: HostPrefix is the prefix size to allocate to each
                         node from the CIDR. For example, 24 would allocate 2^8=256
-                        adresses to each node.
+                        adresses to each node. If this field is not used by the plugin,
+                        it can be left unset.
                       format: int32
                       type: integer
                     hostSubnetLength:
@@ -691,7 +708,6 @@ spec:
                       type: integer
                   required:
                   - cidr
-                  - hostPrefix
                   type: object
                 type: array
               clusterNetworks:
@@ -706,7 +722,8 @@ spec:
                     hostPrefix:
                       description: HostPrefix is the prefix size to allocate to each
                         node from the CIDR. For example, 24 would allocate 2^8=256
-                        adresses to each node.
+                        adresses to each node. If this field is not used by the plugin,
+                        it can be left unset.
                       format: int32
                       type: integer
                     hostSubnetLength:
@@ -717,7 +734,6 @@ spec:
                       type: integer
                   required:
                   - cidr
-                  - hostPrefix
                   type: object
                 type: array
               machineCIDR:
@@ -1021,6 +1037,13 @@ spec:
                           type: object
                         bootMACAddress:
                           type: string
+                        bootMode:
+                          description: BootMode puts the server in legacy (BIOS) or
+                            UEFI mode for booting. The default is UEFI.
+                          enum:
+                          - UEFI
+                          - legacy
+                          type: string
                         hardwareProfile:
                           type: string
                         name:
@@ -1096,11 +1119,9 @@ spec:
                       on the host that will run the bootstrap VM.
                     type: string
                   provisioningDHCPExternal:
-                    description: ProvisioningDHCPExternal indicates that DHCP is provided
-                      by an external service, appropriately configured with next-server
-                      set to BootstrapProvisioningIP for the control plane, and ClusterProvisioningIP
-                      for workers. The default for this field is false, which means
-                      we will start and manage a DHCP server on the provisioning network.
+                    description: DeprecatedProvisioningDHCPExternal indicates that
+                      DHCP is provided by an external service. This parameter is replaced
+                      by ProvisioningNetwork being set to "Unmanaged".
                     type: boolean
                   provisioningDHCPRange:
                     description: ProvisioningDHCPRange is used to provide DHCP services
@@ -1111,6 +1132,16 @@ spec:
                       provisioning network where the baremetal-operator pod runs provisioning
                       services, and an http server to cache some downloaded content
                       e.g RHCOS/IPA images
+                    type: string
+                  provisioningNetwork:
+                    default: Managed
+                    description: ProvisioningNetwork is used to indicate if we will
+                      have a provisioning network, and how it will be managed.
+                    enum:
+                    - ""
+                    - Managed
+                    - Unmanaged
+                    - Disabled
                     type: string
                   provisioningNetworkCIDR:
                     description: ProvisioningNetworkCIDR defines the network to use
@@ -1296,6 +1327,14 @@ spec:
                         description: FlavorName defines the OpenStack Nova flavor.
                           eg. m1.large
                         type: string
+                      zones:
+                        description: Zones is the list of availability zones where
+                          the instances should be deployed. If no zones are provided,
+                          all instances will be deployed on OpenStack Nova default
+                          availability zone
+                        items:
+                          type: string
+                        type: array
                     required:
                     - type
                     type: object
@@ -1350,9 +1389,6 @@ spec:
                 required:
                 - cloud
                 - computeFlavor
-                - octaviaSupport
-                - region
-                - trunkSupport
                 type: object
               ovirt:
                 description: Ovirt is the configuration used when installing on oVirt.

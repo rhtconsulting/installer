@@ -117,6 +117,35 @@ func TestValidatePlatform(t *testing.T) {
 			},
 			expected: `^test-path\.defaultMachinePlatform\.iops: Invalid value: -10: Storage IOPS must be positive$`,
 		},
+		{
+			name: "invalid userTags, Name key",
+			platform: &aws.Platform{
+				Region: "us-east-1",
+				UserTags: map[string]string{
+					"Name": "test-cluster",
+				},
+			},
+			expected: `^\Qtest-path.userTags[Name]: Invalid value: "test-cluster": Name key is not allowed for user defined tags\E$`,
+		},
+		{
+			name: "invalid userTags, key with kubernetes.io/cluster/",
+			platform: &aws.Platform{
+				Region: "us-east-1",
+				UserTags: map[string]string{
+					"kubernetes.io/cluster/test-cluster": "shared",
+				},
+			},
+			expected: `^\Qtest-path.userTags[kubernetes.io/cluster/test-cluster]: Invalid value: "shared": Keys with prefix 'kubernetes.io/cluster/' are not allowed for user defined tags\E$`,
+		},
+		{
+			name: "valid userTags",
+			platform: &aws.Platform{
+				Region: "us-east-1",
+				UserTags: map[string]string{
+					"app": "production",
+				},
+			},
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -14,11 +14,7 @@ locals {
     "rd.neednet=1",
 
     # "rd.break=initqueue"
-    "coreos.inst=yes",
-
-    "coreos.inst.image_url=${var.pxe_os_image_url}",
-    "coreos.inst.install_dev=sda",
-    "coreos.inst.skip_media_check",
+    "coreos.inst.install_dev=/dev/sda",
   ]
 
   pxe_kernel = var.pxe_kernel_url
@@ -52,6 +48,7 @@ resource "matchbox_profile" "master" {
   args = concat(
     local.kernel_args,
     ["coreos.inst.ignition_url=${var.matchbox_http_endpoint}/ignition?cluster_id=${var.cluster_id}&role=master"],
+    [var.pxe_kernel_args],
   )
 
   raw_ignition = file(var.master_ign_file)
@@ -68,6 +65,7 @@ resource "matchbox_profile" "worker" {
   args = concat(
     local.kernel_args,
     ["coreos.inst.ignition_url=${var.matchbox_http_endpoint}/ignition?cluster_id=${var.cluster_id}&role=worker"],
+    [var.pxe_kernel_args],
   )
 
   raw_ignition = file(var.worker_ign_file)
@@ -134,7 +132,10 @@ module "bootstrap" {
 
   pxe_kernel             = local.pxe_kernel
   pxe_initrd             = local.pxe_initrd
-  pxe_kernel_args        = local.kernel_args
+  pxe_kernel_args        = concat(
+    local.kernel_args,
+    [var.pxe_kernel_args],
+  )
   matchbox_http_endpoint = var.matchbox_http_endpoint
   igntion_config_content = file(var.bootstrap_ign_file)
 

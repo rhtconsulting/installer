@@ -4,16 +4,18 @@ Beyond the [platform-agnostic `install-config.yaml` properties](../customization
 
 ## Table of Contents
 
-* [Cluster-scoped properties](#cluster-scoped-properties)
-* [Machine pools](#machine-pools)
-* [Examples](#examples)
-  * [Minimal](#minimal)
-  * [Custom-machine-pools](#custom-machine-pools)
-* [Image Overrides](#image-overrides)
-* [Custom Subnets](#custom-subnets)
-* [Additional Networks](#additional-networks)
-* [Additional Security Groups](#additional-security-groups)
-* [Further customization](#further-customization)
+- [OpenStack Platform Customization](#openstack-platform-customization)
+  - [Table of Contents](#table-of-contents)
+  - [Cluster-scoped properties](#cluster-scoped-properties)
+  - [Machine pools](#machine-pools)
+  - [Examples](#examples)
+    - [Minimal](#minimal)
+    - [Custom machine pools](#custom-machine-pools)
+  - [Image Overrides](#image-overrides)
+  - [Custom Subnets](#custom-subnets)
+  - [Additional Networks](#additional-networks)
+  - [Additional Security Groups](#additional-security-groups)
+  - [Further customization](#further-customization)
 
 ## Cluster-scoped properties
 
@@ -22,7 +24,8 @@ Beyond the [platform-agnostic `install-config.yaml` properties](../customization
     This is currently required, but has lower precedence than [the `type` property](#machine-pools) on [the `compute` and `controlPlane` machine-pools](../customization.md#platform-customization).
 * `externalDNS` (optional list of strings): The IP addresses of DNS servers to be used for the DNS resolution of all instances in the cluster
 * `externalNetwork` (optional string): Name of external network the installer will use to provide access to the cluster. If defined, a floating ip from this network will be created and associated with the bootstrap node to facilitate debugging and connection to the bootstrap node during installation. The lbFloatingIP property is a floating ip address selected from this network.
-* `lbFloatingIP` (optional string): Address of existing Floating IP from externalNetwork the installer will associate with the API load balancer. This property is only valid if externalNetwork is defined. If externalNetwork is not defined, this property is ignored.
+* `lbFloatingIP` (optional string): Address of existing Floating IP from externalNetwork the installer will associate with the API load balancer. This property is only valid if externalNetwork is defined. If externalNetwork is not defined, the installer will throw an error.
+* `ingressFloatingIP` (optional string): Address of an existing Floating IP from externalNetwork the installer will associate with the ingress port. This property is only valid if externalNetwork is defined. If externalNetwork is not defined, the installer will throw an error.
 * `octaviaSupport` (deprecated string): Whether OpenStack supports Octavia (`1` for true or `0` for false)
 * `region` (deprecated string): The OpenStack region where the cluster will be created. Currently this value is not used by the installer.
 * `trunkSupport` (deprecated string): Whether OpenStack ports can be trunked (`1` for true or `0` for false)
@@ -39,6 +42,7 @@ Beyond the [platform-agnostic `install-config.yaml` properties](../customization
 * `rootVolume` (optional object): Defines the root volume for instances in the machine pool. The instances use ephemeral disks if not set.
   * `size` (required integer): Size of the root volume in GB.
   * `type` (required string): The volume pool to create the volume from.
+* `zones` (optional list of strings): The names of the availability zones you want to install your nodes on. If unset, the installer will use your default compute zone.
 
 **NOTE:** The bootstrap node follows the `type` and `rootVolume` parameters from the `controlPlane` machine pool.
 
